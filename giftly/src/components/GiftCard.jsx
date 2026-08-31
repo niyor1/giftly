@@ -1,0 +1,97 @@
+import { useState, useCallback } from "react";
+import { Heart } from "lucide-react";
+import StarRating from "./StarRating";
+
+// ─── Badge color map ────────────────────────────────────────────────
+
+const badgeStyles = {
+  "Best Seller": "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  "Top Rated": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  "Editor's Pick": "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  "Trending": "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  "New": "bg-sky-500/20 text-sky-400 border-sky-500/30",
+};
+
+// ─── Main component ─────────────────────────────────────────────────
+
+export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  const handleImageLoad = useCallback(() => setImgLoaded(true), []);
+
+  return (
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-gold/5">
+      {/* Image */}
+      <div className="relative aspect-[3/2] overflow-hidden bg-deep-purple-light/40">
+        {!imgLoaded && (
+          <div className="absolute inset-0 animate-pulse bg-white/5" />
+        )}
+        <img
+          src={gift.imageUrl}
+          alt={gift.title}
+          loading="lazy"
+          onLoad={handleImageLoad}
+          className={`h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03] ${
+            imgLoaded ? "opacity-100" : "opacity-0"
+          }`}
+        />
+
+        {/* Badge chip */}
+        {gift.badge && (
+          <span
+            className={`absolute left-3 top-3 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
+              badgeStyles[gift.badge] || "bg-white/20 text-white border-white/30"
+            }`}
+          >
+            {gift.badge}
+          </span>
+        )}
+
+        {/* Wishlist heart */}
+        <button
+          type="button"
+          onClick={() => onWishlistToggle?.(gift.id)}
+          className="absolute right-3 top-3 rounded-full bg-black/40 p-2 text-white/70 backdrop-blur-sm transition-all hover:bg-black/60 hover:text-gold group-hover:bg-black/50 group-hover:text-gold"
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <Heart size={18} className={isWishlisted ? "fill-gold text-gold" : ""} />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex flex-1 flex-col p-5">
+        <p className="text-xs font-medium uppercase tracking-widest text-white/30">
+          {gift.category}
+        </p>
+        <h3 className="mt-1.5 text-lg font-bold leading-snug text-white group-hover:text-gold transition-colors">
+          {gift.title}
+        </h3>
+        <p className="mt-2 line-clamp-2 text-sm text-white/50 leading-relaxed flex-1">
+          {gift.description}
+        </p>
+
+        {/* Rating */}
+        <div className="mt-4 flex items-center gap-2">
+          <StarRating rating={gift.rating} />
+          <span className="text-sm font-semibold text-white/80">{gift.rating}</span>
+          <span className="text-xs text-white/30">
+            ({gift.reviewCount.toLocaleString()} reviews)
+          </span>
+        </div>
+
+        {/* Price + CTA */}
+        <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
+          <span className="text-sm font-bold text-gold">{gift.priceRange}</span>
+          <a
+            href={gift.affiliateUrl}
+            rel="noopener noreferrer"
+            target="_blank"
+            className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition-all hover:bg-gold hover:text-deep-purple"
+          >
+            View Gift
+          </a>
+        </div>
+      </div>
+    </article>
+  );
+}

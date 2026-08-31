@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite *)",
+      "Bash(npm install *)",
+      "Bash(npx vitest *)",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/ci.yml'\\)\\)\")",
+      "Bash(node -e \"const yaml = require\\('yaml'\\); const fs = require\\('fs'\\); yaml.parse\\(fs.readFileSync\\('.github/workflows/ci.yml','utf8'\\)\\); console.log\\('YAML is valid'\\)\")",
+      "Bash(npx -y @anthropic/yaml .github/workflows/ci.yml)",
+      "Bash(npx oxlint *)"
+    ]
+  }
+}
