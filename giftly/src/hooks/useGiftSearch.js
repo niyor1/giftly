@@ -1,9 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { sanitizeUrl, extractJSON, buildAmazonURL } from "../utils/helpers.js";
-import { SYSTEM_PROMPT, STRICTER_SYSTEM_PROMPT } from "../config/ai.js";
 
-const OLLAMA_URL = import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434/api/chat";
-const MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:35b";
+const API_URL = "/api/recommendations";
 const FETCH_TIMEOUT = Number(import.meta.env.VITE_FETCH_TIMEOUT) || 60_000;
 
 // ─── Hook ───────────────────────────────────────────────────────────
@@ -73,10 +71,6 @@ export default function useGiftSearch() {
       const budgetRange =
         budget !== null && budget < 500 ? `£0 – £${budget}` : "No strict budget";
 
-      const systemPrompt = SYSTEM_PROMPT;
-
-      const userPrompt = `Generate 12 gift ideas for: ${safeQuery}. Budget: ${budgetRange}. Return a JSON array where each object has exactly these fields: title, description, priceRange, category, searchQuery, reason, emoji. The searchQuery field should be a short Amazon search term for that product.`;
-
       // Retry tracking
       let attempts = 0;
       const maxAttempts = 2;
@@ -89,32 +83,25 @@ export default function useGiftSearch() {
           // Set timeout — kill the fetch after 60s
           const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-          const res = await fetch(OLLAMA_URL, {
+          const res = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: MODEL,
-              stream: false,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-            }),
+            body: JSON.stringify({ query: safeQuery, budgetRange }),
             signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
 
           if (!res.ok) {
-            throw new Error(`Ollama API returned ${res.status}: ${res.statusText}`);
+            throw new Error(`API returned ${res.status}: ${res.statusText}`);
           }
 
           const data = await res.json();
-          const rawText = data?.message?.content || "";
+          // The serverless function returns the parsed JSON array directly
+          const json = Array.isArray(data) ? data : extractJSON(JSON.stringify(data));
 
-          const json = extractJSON(rawText);
           if (!json || !Array.isArray(json) || json.length === 0) {
-            throw new Error("Ollama did not return a valid JSON array.");
+            throw new Error("API did not return a valid JSON array.");
           }
 
           // Normalize into GiftCard-compatible shape
@@ -127,59 +114,47 @@ export default function useGiftSearch() {
 
           if (err.name === "AbortError") {
             setError(
-              "Request timed out after 60 seconds. Ollama may be slow or not running.",
+              "Request timed out after 60 seconds. The AI service may be slow or unavailable.",
             );
             setLoading(false);
             return;
           }
 
-          // Network error (TypeError) — Ollama is unreachable
+          // Network error — serverless endpoint unreachable
           if (err instanceof TypeError) {
             setError(
-              "Cannot connect to Ollama. Make sure it is running at http://localhost:11434.",
+              "Cannot connect to the gift recommendation service. Please try again later.",
             );
             setLoading(false);
             return;
           }
 
           if (attempts >= maxAttempts) {
-            // Second failure — try with stricter prompt
-            const stricterSystem = STRICTER_SYSTEM_PROMPT;
-
-            const stricterPrompt = userPrompt + " Remember: output ONLY a JSON array.";
-
+            // Second failure — retry once more
             try {
               const controller = new AbortController();
               abortRef.current = controller;
 
               const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-              const res = await fetch(OLLAMA_URL, {
+              const res = await fetch(API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: MODEL,
-                  stream: false,
-                  messages: [
-                    { role: "system", content: stricterSystem },
-                    { role: "user", content: stricterPrompt },
-                  ],
-                }),
+                body: JSON.stringify({ query: safeQuery, budgetRange }),
                 signal: controller.signal,
               });
 
               clearTimeout(timeoutId);
 
               if (!res.ok) {
-                throw new Error(`Ollama API returned ${res.status}: ${res.statusText}`);
+                throw new Error(`API returned ${res.status}: ${res.statusText}`);
               }
 
               const data = await res.json();
-              const rawText = data?.message?.content || "";
+              const json = Array.isArray(data) ? data : extractJSON(JSON.stringify(data));
 
-              const json = extractJSON(rawText);
               if (!json || !Array.isArray(json) || json.length === 0) {
-                throw new Error("Ollama did not return a valid JSON array on retry either.");
+                throw new Error("API did not return a valid JSON array on retry either.");
               }
 
               const normalized = json.slice(0, 12).map((item, i) => normalizeGift(item, i));
@@ -189,11 +164,11 @@ export default function useGiftSearch() {
             } catch (retryErr) {
               if (retryErr.name === "AbortError") {
                 setError(
-                  "Request timed out after 60 seconds. Ollama may be slow or not running.",
+                  "Request timed out after 60 seconds. The AI service may be slow or unavailable.",
                 );
               } else {
                 setError(
-                  retryErr.message || "Failed to fetch gift ideas from Ollama.",
+                  retryErr.message || "Failed to fetch gift ideas from the AI service.",
                 );
               }
               setLoading(false);
@@ -201,7 +176,7 @@ export default function useGiftSearch() {
             }
           }
 
-          // First failure — retry with stricter prompt
+          // First failure — retry
           continue;
         }
       }

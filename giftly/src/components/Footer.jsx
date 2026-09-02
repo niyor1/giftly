@@ -90,6 +90,7 @@ export default function Footer() {
           <p className="flex items-center gap-1">
             Made with <Heart size={14} className="text-gold" fill="currentColor" /> for gift-givers everywhere
           </p>
+          <p className="text-xs text-white/20">Powered by Gemini AI</p>
         </div>
       </div>
     </footer>

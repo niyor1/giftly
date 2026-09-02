@@ -9,28 +9,16 @@ function mockFetchSuccess(jsonResponse) {
     ok: true,
     status: 200,
     statusText: "OK",
-    json: () => Promise.resolve({ message: { content: JSON.stringify(jsonResponse) } }),
+    json: () => Promise.resolve(jsonResponse),
   });
 }
-
-function mockFetchMarkdownJson(jsonResponse) {
-  return vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    statusText: "OK",
-    json: () =>
-      Promise.resolve({
-        message: { content: "```json\n" + JSON.stringify(jsonResponse) + "\n```" },
-      }),
-  });
-};
 
 function mockFetchInvalidJson() {
   return vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
     statusText: "OK",
-    json: () => Promise.resolve({ message: { content: "Here are some gift ideas..." } }),
+    json: () => Promise.resolve("Here are some gift ideas..."),
   });
 }
 
@@ -77,7 +65,7 @@ describe("useGiftSearch", () => {
     expect(result.current.error).toBeNull();
   });
 
-  it("calls Ollama and sets results on success", async () => {
+  it("calls the API and sets results on success", async () => {
     global.fetch.mockImplementation(mockFetchSuccess(mockGifts));
 
     const { result } = renderHook(() => useGiftSearch());
@@ -95,8 +83,8 @@ describe("useGiftSearch", () => {
     expect(result.current.results[0].title).toBe("Test Gift");
   });
 
-  it("parses markdown-wrapped JSON response", async () => {
-    global.fetch.mockImplementation(mockFetchMarkdownJson(mockGifts));
+  it("parses direct JSON array response", async () => {
+    global.fetch.mockImplementation(mockFetchSuccess(mockGifts));
 
     const { result } = renderHook(() => useGiftSearch());
 
@@ -110,7 +98,7 @@ describe("useGiftSearch", () => {
     expect(result.current.results[0].title).toBe("Test Gift");
   });
 
-  it("sets error when Ollama returns non-OK status", async () => {
+  it("sets error when API returns non-OK status", async () => {
     global.fetch.mockImplementation(mockFetchServerError());
 
     const { result } = renderHook(() => useGiftSearch());

@@ -386,7 +386,7 @@ export default function Results() {
         )}
         <p className="mt-2 text-sm text-white/40">
           {aiLoading
-            ? "Searching…"
+            ? "Searching with Gemini AI…"
             : aiError
               ? "Unable to load results"
               : `${displayed.length} result${displayed.length !== 1 ? "s" : ""} found`}
@@ -532,7 +532,7 @@ export default function Results() {
               <ErrorState message={aiError} onRetry={handleRetry} />
               {/* Note about local AI */}
               <p className="mt-6 text-center text-xs text-white/25">
-                Powered by local AI · Ollama must be running at http://localhost:11434
+                Powered by Gemini AI
               </p>
             </>
           ) : displayed.length === 0 ? (
@@ -552,7 +552,7 @@ export default function Results() {
               </div>
               {/* Note about local AI */}
               <p className="mt-6 text-center text-xs text-white/25">
-                Powered by local AI · Ollama must be running at http://localhost:11434
+                Powered by Gemini AI
               </p>
             </>
           )}
