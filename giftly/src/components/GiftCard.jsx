@@ -16,25 +16,37 @@ const badgeStyles = {
 
 export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const handleImageLoad = useCallback(() => setImgLoaded(true), []);
+  const handleImageError = useCallback(() => setImgError(true), []);
+
+  // Use the real thumbnail from SerpApi; fall back to null so we show the placeholder
+  const imageUrl = gift.thumbnail && !imgError ? gift.thumbnail : null;
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-gold/5">
       {/* Image */}
       <div className="relative aspect-[3/2] overflow-hidden bg-deep-purple-light/40">
-        {!imgLoaded && (
+        {!imgLoaded && !imgError && (
           <div className="absolute inset-0 animate-pulse bg-white/5" />
         )}
-        <img
-          src={gift.imageUrl}
-          alt={gift.title}
-          loading="lazy"
-          onLoad={handleImageLoad}
-          className={`h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03] ${
-            imgLoaded ? "opacity-100" : "opacity-0"
-          }`}
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={gift.title}
+            loading="lazy"
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            className={`h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03] ${
+              imgLoaded ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-white/15">
+            <span className="text-4xl">{gift.emoji || "🎁"}</span>
+          </div>
+        )}
 
         {/* Badge chip */}
         {gift.badge && (
@@ -81,14 +93,23 @@ export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
 
         {/* Price + CTA */}
         <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
-          <span className="text-sm font-bold text-gold">{gift.priceRange}</span>
+          {gift.price ? (
+            <>
+              <span className="text-sm font-bold text-gold">{gift.price}</span>
+              {gift.retailer && (
+                <span className="ml-2 text-xs text-white/30">From {gift.retailer}</span>
+              )}
+            </>
+          ) : (
+            <span className="text-sm font-bold text-gold">{gift.priceRange || "Price TBD"}</span>
+          )}
           <a
-            href={gift.affiliateUrl}
+            href={gift.productLink || gift.affiliateUrl || "#"}
             rel="noopener noreferrer"
             target="_blank"
             className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition-all hover:bg-gold hover:text-deep-purple"
           >
-            View Gift
+            Buy Now
           </a>
         </div>
       </div>

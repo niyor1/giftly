@@ -42,6 +42,10 @@ export default function useGiftSearch() {
         searchQuery: raw.searchQuery || raw.title,
         reason: raw.reason || "",
         emoji: raw.emoji || "🎁",
+        price: raw.price || null,
+        thumbnail: raw.thumbnail || null,
+        productLink: raw.productLink || sanitizeUrl(amazonURL(raw.searchQuery || raw.title)),
+        retailer: raw.retailer || null,
       };
     },
     [amazonURL],
