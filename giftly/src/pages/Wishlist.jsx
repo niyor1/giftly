@@ -39,17 +39,28 @@ function EmptyState({ onSearch }) {
 function WishlistItem({ gift, onRemove }) {
   const [min, max] = parsePriceRange(gift.priceRange);
   const priceLabel = min !== null && max !== null ? `£${min} – £${max}` : gift.priceRange;
+  const [imgError, setImgError] = useState(false);
+
+  // Use real thumbnail if available; fall back to imageUrl for mockData items
+  const imageUrl = (gift.thumbnail || gift.imageUrl) && !imgError ? (gift.thumbnail || gift.imageUrl) : null;
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-gold/5">
       {/* Image */}
       <div className="relative aspect-[3/2] overflow-hidden bg-deep-purple-light/40">
-        <img
-          src={gift.imageUrl}
-          alt={gift.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03]"
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={gift.title}
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-white/15">
+            <span className="text-4xl">{gift.emoji || "🎁"}</span>
+          </div>
+        )}
 
         {/* Badge chip */}
         {gift.badge && (
@@ -107,7 +118,7 @@ function WishlistItem({ gift, onRemove }) {
         <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
           <span className="text-sm font-bold text-gold">{priceLabel}</span>
           <a
-            href={gift.affiliateUrl}
+            href={gift.productLink || gift.affiliateUrl || "#"}
             rel="noopener noreferrer"
             target="_blank"
             className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition-all hover:bg-gold hover:text-deep-purple"
@@ -415,6 +426,9 @@ export default function Wishlist() {
   const activeList = wishlists?.lists?.[activeId];
   const listCount = wishlists ? Object.keys(wishlists.lists).length : 0;
 
+  // Show a message when user has flat wishlist items but no named lists yet
+  const showFlatSuggestion = !wishlists && flatWishlist.ids.size > 0;
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
@@ -494,7 +508,28 @@ export default function Wishlist() {
 
       {/* Content */}
       {!activeList || !activeList.items.length ? (
-        <EmptyState onSearch={handleSearch} />
+        showFlatSuggestion ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-gold/20 bg-gold/[0.03] py-24 text-center">
+            <div className="rounded-full bg-gold/10 p-6">
+              <Heart size={48} className="text-gold/40" />
+            </div>
+            <h3 className="mt-6 text-xl font-bold text-white">
+              You have {flatWishlist.ids.size} saved gift{flatWishlist.ids.size !== 1 ? "s" : ""}
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/40">
+              Create a named wishlist to organize your saved gifts.
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="mt-8 flex items-center gap-2 rounded-xl bg-gold px-8 py-3 text-base font-bold text-deep-purple shadow-lg shadow-gold/20 transition-all hover:bg-gold-hover"
+            >
+              <Plus size={18} />
+              Create your first wishlist
+            </button>
+          </div>
+        ) : (
+          <EmptyState onSearch={handleSearch} />
+        )
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {activeList.items.map((gift) => (

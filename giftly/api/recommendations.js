@@ -1,5 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// ─── URL sanitization ────────────────────────────────────────────────
+
+function sanitizeUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  try {
+    const parsed = new URL(url);
+    if (["http:", "https:"].includes(parsed.protocol)) return parsed.href;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const SYSTEM_PROMPT =
   "You are a gift recommendation expert. Respond with ONLY a valid JSON array. " +
   "No markdown, no backticks, no explanation. Just raw JSON. Avoid generic " +
@@ -32,11 +45,23 @@ async function fetchProduct(searchQuery) {
     const products = data?.shopping_results || [];
     if (!products.length) return null;
     const p = products[0];
+
+    // Multi-level product link priority:
+    // 1. result.link (direct shopping URL)
+    // 2. result.product_link (alternative SerpApi field)
+    // 3. sellers_results.online_sellers[0].link (first online seller)
+    const rawProductLink =
+      p.link ||
+      p.product_link ||
+      p.sellers_results?.online_sellers?.[0]?.link ||
+      null;
+
     return {
       title: p.title || searchQuery,
       price: p.price || null,
       thumbnail: p.thumbnail || p.img_url || null,
-      link: p.link || null,
+      link: sanitizeUrl(p.link) || null,
+      productLink: sanitizeUrl(rawProductLink) || null,
       source: p.source || null,
     };
   } catch {
@@ -115,11 +140,19 @@ export default async function handler(req, res) {
           // Fallback: Amazon UK search link if no SerpApi result
           const fallbackLink = `https://www.amazon.co.uk/s?k=${encodeURIComponent(item.searchQuery || item.title)}`;
 
+          // Build productLink with full priority chain + sanitizeUrl validation
+          const rawProductLink =
+            product?.link ||
+            product?.product_link ||
+            product?.sellers_results?.online_sellers?.[0]?.link ||
+            null;
+          const resolvedProductLink = sanitizeUrl(rawProductLink) || fallbackLink;
+
           return {
             ...item,
             price: product?.price || null,
             thumbnail: product?.thumbnail || null,
-            productLink: product?.link || fallbackLink,
+            productLink: resolvedProductLink,
             retailer: product?.source || "Amazon UK",
           };
         }),
