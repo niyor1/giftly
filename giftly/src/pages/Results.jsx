@@ -11,11 +11,9 @@ import {
   Sparkles,
   Heart,
 } from "lucide-react";
-import GiftCard from "../components/GiftCard";
 import Toast from "../components/Toast";
 import EmailModal from "../components/EmailModal";
 import useGiftSearch from "../hooks/useGiftSearch";
-import { extractBudget, parsePriceForSort } from "../utils/helpers.js";
 import { useAiLoading } from "../context/AiLoadingContext";
 
 // ─── Data constants ────────────────────────────────────────────────
@@ -110,7 +108,7 @@ function ErrorState({ message, onRetry }) {
         Unable to fetch gift ideas
       </h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/40">
-        {message || "We couldn't connect to the local AI model. Make sure Ollama is running at http://localhost:11434."}
+        {message || "We couldn't connect to the gift recommendation service. Please try again later."}
       </p>
       <button
         onClick={onRetry}
@@ -126,9 +124,9 @@ function ErrorState({ message, onRetry }) {
 // ─── Product card component ─────────────────────────────────────────
 
 function ProductCard({ product }) {
-  if (!product) return null;
-
   const [imgError, setImgError] = useState(false);
+
+  if (!product) return null;
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-gold/5">
@@ -297,8 +295,6 @@ export default function Results() {
     return aiResults.flatMap((idea) => idea?.products ?? []);
   }, [aiResults]);
 
-  if (!aiResults) return <LoadingSkeleton />;
-
   // State
   const [query, setQuery] = useState(initialQuery);
   const [budget, setBudget] = useState(() => {
@@ -328,22 +324,6 @@ export default function Results() {
     // Only run on mount — don't re-run when budget changes (that's handled by filter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
-
-  // Check if a gift matches the budget (priceRange contains a value <= budget)
-  function matchesBudget(gift, budget) {
-    if (!budget || budget >= 500) return true;
-    const price = parsePriceForSort(gift.price);
-    if (price === null) return true;
-    return price <= budget;
-  }
-
-  // Check if a gift matches selected categories
-  function matchesCategory(gift, cats) {
-    if (cats.length === 0) return true;
-    return cats.includes(gift.category);
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Update URL when query changes
   const updateQuery = useCallback(
@@ -399,6 +379,13 @@ export default function Results() {
 
   const hasActiveFilters = categories.length > 0 || occasion !== "" || budget < 500;
 
+  // Retry handler
+  const handleRetry = useCallback(() => {
+    if (query.trim()) {
+      search(query, budget);
+    }
+  }, [query, budget, search]);
+
   // Guard against empty results
   if (aiResults?.length === 0 && !aiLoading && !aiError) {
     return (
@@ -411,13 +398,6 @@ export default function Results() {
       </div>
     );
   }
-
-  // Retry handler
-  const handleRetry = useCallback(() => {
-    if (query.trim()) {
-      search(query, budget);
-    }
-  }, [query, budget, search]);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

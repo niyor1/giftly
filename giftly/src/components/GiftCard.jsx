@@ -15,13 +15,13 @@ const badgeStyles = {
 // ─── Main component ─────────────────────────────────────────────────
 
 export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
-  if (!gift) return null;
-
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   const handleImageLoad = useCallback(() => setImgLoaded(true), []);
   const handleImageError = useCallback(() => setImgError(true), []);
+
+  if (!gift) return null;
 
   // Use the real thumbnail from SerpApi; fall back to null so we show the placeholder
   const imageUrl = gift.thumbnail && !imgError ? gift.thumbnail : null;

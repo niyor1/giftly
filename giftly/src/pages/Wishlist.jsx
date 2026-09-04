@@ -37,9 +37,12 @@ function EmptyState({ onSearch }) {
 // ─── Wishlist item card ─────────────────────────────────────────────
 
 function WishlistItem({ gift, onRemove }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (!gift) return null;
+
   const [min, max] = parsePriceRange(gift.priceRange);
   const priceLabel = min !== null && max !== null ? `£${min} – £${max}` : gift.priceRange || 'Price unavailable';
-  const [imgError, setImgError] = useState(false);
 
   // Use real thumbnail if available; fall back to imageUrl for mockData items
   const imageUrl = (gift.thumbnail || gift.imageUrl) && !imgError ? (gift.thumbnail || gift.imageUrl) : null;
@@ -293,12 +296,11 @@ export default function Wishlist() {
     setToastMsg(`Added ${gifts.length} gift${gifts.length > 1 ? "s" : ""} from shared list!`);
     setToastType("success");
 
-    // Clean URL
-    searchParams.delete("items");
-    if (searchParams.toString()) {
-      navigate(`?${searchParams.toString()}`, { replace: true });
-    } else {
-      navigate(window.location.pathname, { replace: true });
+    // Clean URL — remove items param without triggering another effect run
+    if (window.location.search.includes("items=")) {
+      const url = new URL(window.location);
+      url.searchParams.delete("items");
+      navigate(url.pathname + (url.search ? `?${url.search}` : ""), { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -4,9 +4,10 @@ import { Star } from "lucide-react";
 // Renders a 5-star rating with half-star support.
 // Usage: <StarRating rating={4.5} /> → ★★★★☆ (filled, filled, filled, filled, half, empty)
 
-export default function StarRating({ rating }) {
-  const full = Math.floor(rating);
-  const half = rating % 1 >= 0.5;
+export default function StarRating({ rating = 0 }) {
+  const num = Number(rating) || 0;
+  const full = Math.floor(num);
+  const half = num % 1 >= 0.5;
   const empty = 5 - full - (half ? 1 : 0);
 
   return (

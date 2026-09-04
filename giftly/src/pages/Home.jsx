@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, Search, Gift, X as XIcon } from "lucide-react";
 import GiftCard from "../components/GiftCard";

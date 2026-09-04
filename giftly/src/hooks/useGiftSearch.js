@@ -48,34 +48,6 @@ export default function useGiftSearch() {
     [amazonURL],
   );
 
-  // Transform API response (new shape) into flat array of products for display
-  const normalizeResponse = useCallback(
-    (data) => {
-      if (!data) return [];
-
-      // New shape: { ideas: [{ ideaTitle, description, reason, emoji, category, products: [...] }] }
-      if (data.ideas && Array.isArray(data.ideas)) {
-        const flat = [];
-        data.ideas.forEach((idea) => {
-          if (idea.products && Array.isArray(idea.products)) {
-            idea.products.forEach((product) => {
-              flat.push(normalizeProduct(product, idea.ideaTitle));
-            });
-          }
-        });
-        return flat;
-      }
-
-      // Fallback: old shape (array of gift objects)
-      if (Array.isArray(data)) {
-        return data.map((item, i) => normalizeGift(item, i));
-      }
-
-      return [];
-    },
-    [normalizeProduct],
-  );
-
   // Legacy normalizer for old response shape (kept as fallback)
   const normalizeGift = useCallback(
     (raw, index) => {
@@ -133,119 +105,96 @@ export default function useGiftSearch() {
       const budgetRange =
         budget !== null && budget < 500 ? `£0 – £${budget}` : "No strict budget";
 
-      // Retry tracking
-      let attempts = 0;
-      const maxAttempts = 2;
-
-      while (attempts < maxAttempts) {
+      // Shared fetch wrapper with timeout
+      async function fetchWithTimeout() {
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
         try {
-          const controller = new AbortController();
-          abortRef.current = controller;
-
-          // Set timeout — kill the fetch after 60s
-          const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
           const res = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query: safeQuery, budgetRange }),
             signal: controller.signal,
           });
-
           clearTimeout(timeoutId);
+          if (!res.ok) throw new Error(`API returned ${res.status}: ${res.statusText}`);
+          return res.json();
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
 
-          if (!res.ok) {
-            throw new Error(`API returned ${res.status}: ${res.statusText}`);
-          }
+      // Normalize raw API response into GiftCard-compatible flat array
+      function normalize(raw) {
+        // New shape: { ideas: [{ ideaTitle, products: [...] }] }
+        if (raw?.ideas && Array.isArray(raw.ideas)) {
+          const flat = [];
+          raw.ideas.forEach((idea) => {
+            if (idea.products && Array.isArray(idea.products)) {
+              idea.products.forEach((product) => {
+                flat.push(normalizeProduct(product, idea.ideaTitle));
+              });
+            }
+          });
+          return flat;
+        }
+        // Fallback: old shape (array of gift objects)
+        if (Array.isArray(raw)) return raw.map((item, i) => normalizeGift(item, i));
+        return [];
+      }
 
-          const data = await res.json();
+      // Validate response is usable
+      function validateResponse(data) {
+        // New shape — ideas array
+        if (data?.ideas && Array.isArray(data.ideas)) return true;
+        // Old shape — direct array
+        if (Array.isArray(data)) return true;
+        // Try extracting JSON from text response
+        const json = extractJSON(JSON.stringify(data));
+        return json && Array.isArray(json);
+      }
+
+      // Fetch with retry logic
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const data = await fetchWithTimeout();
           console.log("Raw API response:", data);
-          // The serverless function now returns { ideas: [...] } shape
-          const json = data?.ideas || (Array.isArray(data) ? data : extractJSON(JSON.stringify(data)));
 
-          if (!json || !Array.isArray(json)) {
-            throw new Error("API did not return a valid JSON array.");
+          if (!validateResponse(data)) {
+            throw new Error(attempt === 1 ? "API did not return a valid JSON array." : "API did not return a valid JSON array on retry.");
           }
 
-          // Normalize into GiftCard-compatible shape
-          const normalized = normalizeResponse(data);
-          setResults(normalized);
+          setResults(normalize(data));
           setLoading(false);
           return; // success — exit
         } catch (err) {
-          attempts++;
+          lastErr = err;
 
           if (err.name === "AbortError") {
-            setError(
-              "Request timed out after 60 seconds. The AI service may be slow or unavailable.",
-            );
+            setError("Request timed out after 60 seconds. The AI service may be slow or unavailable.");
             setLoading(false);
             return;
           }
 
           // Network error — serverless endpoint unreachable
           if (err instanceof TypeError) {
-            setError(
-              "Cannot connect to the gift recommendation service. Please try again later.",
-            );
+            setError("Cannot connect to the gift recommendation service. Please try again later.");
             setLoading(false);
             return;
           }
 
-          if (attempts >= maxAttempts) {
-            // Second failure — retry once more
-            try {
-              const controller = new AbortController();
-              abortRef.current = controller;
-
-              const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
-              const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: safeQuery, budgetRange }),
-                signal: controller.signal,
-              });
-
-              clearTimeout(timeoutId);
-
-              if (!res.ok) {
-                throw new Error(`API returned ${res.status}: ${res.statusText}`);
-              }
-
-              const data = await res.json();
-              console.log("Raw API response (retry):", data);
-              const json = data?.ideas || (Array.isArray(data) ? data : extractJSON(JSON.stringify(data)));
-
-              if (!json || !Array.isArray(json)) {
-                throw new Error("API did not return a valid JSON array on retry either.");
-              }
-
-              const normalized = normalizeResponse(data);
-              setResults(normalized);
-              setLoading(false);
-              return;
-            } catch (retryErr) {
-              if (retryErr.name === "AbortError") {
-                setError(
-                  "Request timed out after 60 seconds. The AI service may be slow or unavailable.",
-                );
-              } else {
-                setError(
-                  retryErr.message || "Failed to fetch gift ideas from the AI service.",
-                );
-              }
-              setLoading(false);
-              return;
-            }
-          }
-
-          // First failure — retry
-          continue;
+          // First failure — retry on second attempt
+          if (attempt === 1) continue;
         }
       }
+
+      // Both attempts failed
+      setError(lastErr?.message || "Failed to fetch gift ideas from the AI service.");
+      setLoading(false);
     },
-    [normalizeResponse],
+    [normalizeProduct, normalizeGift],
   );
 
   // Cleanup on unmount — abort any in-flight request
