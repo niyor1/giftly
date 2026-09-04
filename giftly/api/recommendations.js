@@ -45,7 +45,7 @@ async function fetchProducts(searchQuery) {
   console.log("[fetchProducts] SerpApi URL:", url.toString());
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash" });
 
     console.log("[handler] Sending request to Gemini...");
     const result = await model.generateContent([SYSTEM_PROMPT, userMessage]);
