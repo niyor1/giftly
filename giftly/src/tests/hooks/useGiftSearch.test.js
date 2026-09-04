@@ -2,89 +2,93 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import useGiftSearch from "../../hooks/useGiftSearch.js";
 
-// ─── Mock fetch ──────────────────────────────────────────────────────
+// ─── SSE event helper ──────────────────────────────────────────────
 
-function mockFetchSuccess(jsonResponse) {
-  return vi.fn().mockResolvedValue({
+function sseEvent(type, data) {
+  return `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function mockSSEStream(events) {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      for (const event of events) {
+        controller.enqueue(encoder.encode(event));
+      }
+      controller.close();
+    },
+  });
+
+  global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
     statusText: "OK",
-    json: () => Promise.resolve(jsonResponse),
+    body,
   });
 }
 
-function mockFetchInvalidJson() {
-  return vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    statusText: "OK",
-    json: () => Promise.resolve("Here are some gift ideas..."),
-  });
+function mockNetworkError() {
+  global.fetch = vi.fn().mockRejectedValue(new TypeError("Network error"));
 }
 
-function mockFetchServerError() {
-  return vi.fn().mockResolvedValue({
-    ok: false,
-    status: 500,
-    statusText: "Internal Server Error",
-  });
-}
+// ─── Shared test data ──────────────────────────────────────────────
 
-// ─── Shared test data ─────────────────────────────────────────────────
-
-const mockGifts = [
-  {
-    title: "Test Gift",
-    description: "A test gift",
-    priceRange: "£29 – £59",
-    category: "Toys & Games",
-    searchQuery: "test gift",
-    reason: "It's great",
-    emoji: "🎁",
-  },
-];
+const mockIdea = {
+  ideaTitle: "Test Gift Idea",
+  description: "A test gift",
+  reason: "It's great",
+  emoji: "🎁",
+  category: "Gift Idea",
+  products: [{ title: "Test Product", price: "£29.99", thumbnail: null, productLink: null, retailer: "Amazon" }],
+};
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
 describe("useGiftSearch", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     global.fetch = vi.fn();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it("starts with empty results and no loading/error", async () => {
+  it("starts with empty results and no loading/error", () => {
     const { result } = renderHook(() => useGiftSearch());
 
     expect(result.current.results).toEqual([]);
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
+    expect(result.current.isDone.current).toBe(false);
   });
 
-  it("calls the API and sets results on success", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess(mockGifts));
+  it("streams ideas and appends products progressively", async () => {
+    const events = [
+      sseEvent("idea", mockIdea),
+      sseEvent("done", {}),
+    ];
+    mockSSEStream(events);
 
     const { result } = renderHook(() => useGiftSearch());
 
     await act(async () => {
       result.current.search("test query", 100);
     });
-
-    // Need to advance timers for the fetch timeout
-    await vi.advanceTimersByTimeAsync(100);
 
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
+    expect(result.current.isDone.current).toBe(true);
     expect(result.current.results).toHaveLength(1);
-    expect(result.current.results[0].title).toBe("Test Gift");
+    expect(result.current.results[0].title).toBe("Test Product");
   });
 
-  it("parses direct JSON array response", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess(mockGifts));
+  it("appends multiple streamed ideas", async () => {
+    const events = [
+      sseEvent("idea", { ...mockIdea, ideaTitle: "Idea 1" }),
+      sseEvent("idea", { ...mockIdea, ideaTitle: "Idea 2" }),
+      sseEvent("done", {}),
+    ];
+    mockSSEStream(events);
 
     const { result } = renderHook(() => useGiftSearch());
 
@@ -92,14 +96,15 @@ describe("useGiftSearch", () => {
       result.current.search("test query", 100);
     });
 
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(result.current.results).toHaveLength(1);
-    expect(result.current.results[0].title).toBe("Test Gift");
+    expect(result.current.results).toHaveLength(2);
+    expect(result.current.isDone.current).toBe(true);
   });
 
-  it("sets error when API returns non-OK status", async () => {
-    global.fetch.mockImplementation(mockFetchServerError());
+  it("handles server error event", async () => {
+    const events = [
+      sseEvent("error", { message: "Service unavailable" }),
+    ];
+    mockSSEStream(events);
 
     const { result } = renderHook(() => useGiftSearch());
 
@@ -107,14 +112,13 @@ describe("useGiftSearch", () => {
       result.current.search("test query", 100);
     });
 
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(result.current.error).toContain("500");
+    expect(result.current.error).toContain("Service unavailable");
     expect(result.current.loading).toBe(false);
+    expect(result.current.isDone.current).toBe(true);
   });
 
-  it("sets error when response contains no valid JSON array", async () => {
-    global.fetch.mockImplementation(mockFetchInvalidJson());
+  it("handles network error gracefully", async () => {
+    mockNetworkError();
 
     const { result } = renderHook(() => useGiftSearch());
 
@@ -122,63 +126,12 @@ describe("useGiftSearch", () => {
       result.current.search("test query", 100);
     });
 
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(result.current.error).toContain("valid JSON array");
+    expect(result.current.error).toContain("Cannot connect");
     expect(result.current.loading).toBe(false);
-  });
-
-  it("returns '#' for sanitizeUrl when imageUrl is null", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess([
-      { ...mockGifts[0], imageUrl: null },
-    ]));
-
-    const { result } = renderHook(() => useGiftSearch());
-
-    await act(async () => {
-      result.current.search("test query", 100);
-    });
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(result.current.results[0].imageUrl).toBe("#");
-  });
-
-  it("rejects javascript: URLs via sanitizeUrl", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess([
-      { ...mockGifts[0], imageUrl: "javascript:alert(1)" },
-    ]));
-
-    const { result } = renderHook(() => useGiftSearch());
-
-    await act(async () => {
-      result.current.search("test query", 100);
-    });
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(result.current.results[0].imageUrl).toBe("#");
-  });
-
-  it("rejects data: URLs via sanitizeUrl", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess([
-      { ...mockGifts[0], imageUrl: "data:text/html,<h1>xss</h1>" },
-    ]));
-
-    const { result } = renderHook(() => useGiftSearch());
-
-    await act(async () => {
-      result.current.search("test query", 100);
-    });
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(result.current.results[0].imageUrl).toBe("#");
+    expect(result.current.isDone.current).toBe(true);
   });
 
   it("rejects short queries (< 3 chars)", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess(mockGifts));
-
     const { result } = renderHook(() => useGiftSearch());
 
     await act(async () => {
@@ -190,44 +143,50 @@ describe("useGiftSearch", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("truncates queries longer than 200 chars", async () => {
-    global.fetch.mockImplementation(mockFetchSuccess(mockGifts));
+  it("rejects empty queries", async () => {
+    const { result } = renderHook(() => useGiftSearch());
 
+    await act(async () => {
+      result.current.search("", 100);
+    });
+
+    expect(result.current.error).toContain("search query");
+    expect(result.current.loading).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("truncates queries longer than 200 chars", async () => {
     const longQuery = "a".repeat(250);
+    mockSSEStream([sseEvent("done", {})]);
+
     const { result } = renderHook(() => useGiftSearch());
 
     await act(async () => {
       result.current.search(longQuery, 100);
     });
 
-    await vi.advanceTimersByTimeAsync(100);
-
-    // Should not error — the hook truncates internally
     expect(result.current.error).toBeNull();
+    expect(global.fetch).toHaveBeenCalled();
   });
 
-  it("generates correct Amazon affiliate URL", () => {
-    const { result } = renderHook(() => useGiftSearch());
-    const url = result.current.amazonURL("fishing rod");
-    expect(url).toBe("https://www.amazon.co.uk/s?k=fishing+rod&tag=giftly-21");
-  });
+  it("aborts in-flight request on new search", async () => {
+    let resolveFirst;
+    const promise = new Promise((resolve) => { resolveFirst = resolve; });
 
-  it("caps results to 12 items", async () => {
-    const manyGifts = Array.from({ length: 20 }, (_, i) => ({
-      ...mockGifts[0],
-      title: `Gift ${i}`,
-    }));
-
-    global.fetch.mockImplementation(mockFetchSuccess(manyGifts));
+    global.fetch = vi.fn().mockImplementation(() => promise);
 
     const { result } = renderHook(() => useGiftSearch());
 
     await act(async () => {
-      result.current.search("test query", 100);
+      result.current.search("first query", 100);
     });
 
-    await vi.advanceTimersByTimeAsync(100);
+    const abortController = global.fetch.mock.calls[0][1].signal;
 
-    expect(result.current.results).toHaveLength(12);
+    await act(async () => {
+      result.current.search("second query", 100);
+    });
+
+    expect(abortController.aborted).toBe(true);
   });
 });

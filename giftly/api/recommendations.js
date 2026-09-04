@@ -44,58 +44,49 @@ async function fetchProducts(searchQuery) {
 
   console.log("[fetchProducts] SerpApi URL:", url.toString());
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+  const res = await fetch(url.toString());
+  console.log("[fetchProducts] SerpApi status:", res.status);
+  if (!res.ok) return [];
 
-  try {
-    const res = await fetch(url.toString(), { signal: controller.signal });
-    console.log("[fetchProducts] SerpApi status:", res.status);
-    if (!res.ok) return [];
-    const data = await res.json();
-    console.log("[fetchProducts] Raw SerpApi response keys:", Object.keys(data));
-    console.log("[fetchProducts] shopping_results count:", (data?.shopping_results || []).length);
+  const data = await res.json();
+  console.log("[fetchProducts] Raw SerpApi response keys:", Object.keys(data));
+  console.log("[fetchProducts] shopping_results count:", (data?.shopping_results || []).length);
 
-    // Log first result to inspect field names
-    if (data?.shopping_results?.[0]) {
-      console.log("[fetchProducts] First SerpApi result keys:", Object.keys(data.shopping_results[0]));
-      console.log("[fetchProducts] First SerpApi result sample:", JSON.stringify(data.shopping_results[0], null, 2));
-    }
-
-    const products = data?.shopping_results || [];
-    if (!products.length) {
-      // Fallback: return an Amazon search link when no shopping results
-      console.log("[fetchProducts] No shopping results, returning Amazon fallback for:", searchQuery);
-      return [
-        {
-          title: searchQuery,
-          price: "Price TBD",
-          thumbnail: null,
-          productLink: `https://www.amazon.co.uk/s?k=${encodeURIComponent(searchQuery)}`,
-          retailer: "Amazon UK",
-        },
-      ];
-    }
-
-    return products.slice(0, 6).map((p) => {
-      const rawProductLink =
-        p.link ||
-        p.product_link ||
-        p.sellers_results?.online_sellers?.[0]?.link ||
-        null;
-      return {
-        title: p.title || searchQuery,
-        price: p.price || null,
-        thumbnail: p.thumbnail || p.img_url || null,
-        productLink: sanitizeUrl(rawProductLink) || null,
-        retailer: p.source || null,
-      };
-    });
-  } catch (err) {
-    console.error("[fetchProducts] Error fetching products:", err.message);
-    return [];
-  } finally {
-    clearTimeout(timeoutId);
+  // Log first result to inspect field names
+  if (data?.shopping_results?.[0]) {
+    console.log("[fetchProducts] First SerpApi result keys:", Object.keys(data.shopping_results[0]));
+    console.log("[fetchProducts] First SerpApi result sample:", JSON.stringify(data.shopping_results[0], null, 2));
   }
+
+  const products = data?.shopping_results || [];
+  if (!products.length) {
+    // Fallback: return an Amazon search link when no shopping results
+    console.log("[fetchProducts] No shopping results, returning Amazon fallback for:", searchQuery);
+    return [
+      {
+        title: searchQuery,
+        price: "Price TBD",
+        thumbnail: null,
+        productLink: `https://www.amazon.co.uk/s?k=${encodeURIComponent(searchQuery)}`,
+        retailer: "Amazon UK",
+      },
+    ];
+  }
+
+  return products.slice(0, 6).map((p) => {
+    const rawProductLink =
+      p.link ||
+      p.product_link ||
+      p.sellers_results?.online_sellers?.[0]?.link ||
+      null;
+    return {
+      title: p.title || searchQuery,
+      price: p.price || null,
+      thumbnail: p.thumbnail || p.img_url || null,
+      productLink: sanitizeUrl(rawProductLink) || null,
+      retailer: p.source || null,
+    };
+  });
 }
 
 // ─── Main handler ───────────────────────────────────────────────────
@@ -156,14 +147,20 @@ export default async function handler(req, res) {
 
     console.log("[handler] Parsed ideas count:", parsed.length);
 
-    // Fetch up to 6 products for each of the 3 ideas — all in parallel
-    const ideasWithProducts = await Promise.all(
-      parsed.map(async (idea) => {
+    // Stream each idea's products one by one as they arrive
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.write("\n"); // start the SSE stream
+
+    try {
+      for (const idea of parsed) {
         const searchQ = idea.searchQuery || idea.ideaTitle;
         console.log("[handler] Fetching products for idea:", JSON.stringify(idea));
         const products = await fetchProducts(searchQ);
         console.log("[handler] Products fetched for", idea.ideaTitle, ":", products.length);
-        return {
+
+        const streamedIdeas = {
           ideaTitle: idea.ideaTitle,
           description: idea.description || "",
           reason: idea.reason || "",
@@ -171,16 +168,23 @@ export default async function handler(req, res) {
           category: idea.category || "Gift Idea",
           products,
         };
-      }),
-    );
 
-    console.log("[handler] Final ideasWithProducts:", JSON.stringify(ideasWithProducts, null, 2));
+        res.write(`event: idea\ndata: ${JSON.stringify(streamedIdeas)}\n\n`);
+      }
 
-    res.setHeader("Content-Type", "application/json");
-    return res.status(200).json({ ideas: ideasWithProducts });
+      // Signal completion
+      res.write("event: done\ndata: {}\n\n");
+      res.end();
+    } catch (streamErr) {
+      console.error("[handler] Streaming error:", streamErr.message);
+      res.write(`event: error\ndata: ${JSON.stringify({ message: streamErr.message })}\n\n`);
+      res.end();
+    }
   } catch (err) {
     console.error("[handler] Gemini API error:", err.message);
-    res.setHeader("Content-Type", "application/json");
-    return res.status(500).json({ error: "Failed to generate gift recommendations" });
+    try {
+      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
+      res.end();
+    } catch {}
   }
 }

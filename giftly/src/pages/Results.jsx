@@ -286,8 +286,8 @@ export default function Results() {
   const urlBudget = searchParams.get("budget");
   const { setAiLoading } = useAiLoading();
 
-  // Gift search hook (AI-powered)
-  const { results: aiResults, loading: aiLoading, error: aiError, search } = useGiftSearch();
+  // Gift search hook (AI-powered, SSE streaming)
+  const { results: aiResults, loading: aiLoading, error: aiError, isDone, search } = useGiftSearch();
 
   // Flatten all products from all ideas into a single array
   const products = useMemo(() => {
@@ -386,8 +386,8 @@ export default function Results() {
     }
   }, [query, budget, search]);
 
-  // Guard against empty results
-  if (aiResults?.length === 0 && !aiLoading && !aiError) {
+  // Guard against empty results (only after stream is complete)
+  if (aiResults?.length === 0 && !aiLoading && !aiError && isDone?.current) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] py-24 text-center">
         <Search size={48} className="mb-4 text-white/15" />
@@ -541,9 +541,9 @@ export default function Results() {
 
         {/* Results */}
         <div className="flex-1">
-          {aiLoading ? (
+          {aiLoading && products.length === 0 ? (
             <>
-              {/* Loading state */}
+              {/* Loading state — no results yet */}
               <div className="mb-8 flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/[0.03] px-6 py-5">
                 <span className="text-2xl animate-bounce">🎁</span>
                 <p className="text-base font-medium text-gold">
@@ -556,6 +556,19 @@ export default function Results() {
                 </span>
               </div>
               <LoadingSkeleton />
+            </>
+          ) : aiLoading && products.length > 0 ? (
+            <>
+              {/* Streaming — show partial results */}
+              <div className="mb-4 flex items-center gap-2 text-sm text-gold/70">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold" />
+                Showing {products.length} result{products.length !== 1 ? "s" : ""}…
+              </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {products.map((product, idx) => (
+                  <ProductCard key={`${product.title}_${idx}`} product={product} />
+                ))}
+              </div>
             </>
           ) : aiError ? (
             <>
