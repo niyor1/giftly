@@ -87,6 +87,7 @@ export default async function handler(req, res) {
 
     const result = await model.generateContent([SYSTEM_PROMPT, userMessage]);
     const text = result.response.text();
+    console.log("Raw Gemini response:", text);
 
     let parsed;
     try {
@@ -118,7 +119,8 @@ export default async function handler(req, res) {
     }
 
     if (!Array.isArray(parsed)) {
-      throw new Error("Response was not a JSON array");
+      console.warn("Gemini response parsed but was not an array, wrapping:", typeof parsed);
+      return res.status(200).json({ ideas: [] });
     }
 
     // Fetch up to 6 products for each of the 3 ideas — all in parallel

@@ -2,7 +2,7 @@ export const popularGifts = [
   {
     title: "Kindle Paperwhite 16GB",
     price: "£149.99",
-    thumbnail: "https://m.media-amazon.com/images/I/61hnuOBJsNL._AC_SL1000_.jpg",
+    thumbnail: "https://ws-eu.amazon-adsystem.com/widgets/q?_encoding=UTF8&ASIN=B09TMF6742&ServiceVersion=20070822&ID=AsinImage&WS=1&Format=_SL250_&tag=giftly-21",
     productLink: "https://www.amazon.co.uk/dp/B09TMF6742",
     retailer: "Amazon",
     emoji: "📚",
@@ -11,7 +11,7 @@ export const popularGifts = [
   {
     title: "LEGO Botanical Collection Dried Flower Centrepiece",
     price: "£49.99",
-    thumbnail: "https://m.media-amazon.com/images/I/81h6jFKbApL._AC_SL1500_.jpg",
+    thumbnail: "https://ws-eu.amazon-adsystem.com/widgets/q?_encoding=UTF8&ASIN=B0CG9FKWXN&ServiceVersion=20070822&ID=AsinImage&WS=1&Format=_SL250_&tag=giftly-21",
     productLink: "https://www.amazon.co.uk/dp/B0CG9FKWXN",
     retailer: "Amazon",
     emoji: "🌸",
@@ -20,7 +20,7 @@ export const popularGifts = [
   {
     title: "Personalised Star Map Print",
     price: "£24.99",
-    thumbnail: "https://i.etsystatic.com/isla/e4b5e8/114441732/isla_1588xN.114441732_pn5s.jpg",
+    thumbnail: "https://placehold.co/400x400/1a0533/gold?text=Star+Map+Print",
     productLink: "https://www.etsy.com/uk/listing/1234567/personalised-star-map",
     retailer: "Etsy",
     emoji: "⭐",
@@ -29,7 +29,7 @@ export const popularGifts = [
   {
     title: "Luxury Gin & Tonic Gift Set",
     price: "£34.99",
-    thumbnail: "https://m.media-amazon.com/images/I/71Kp6JRMOSL._AC_SL1500_.jpg",
+    thumbnail: "https://ws-eu.amazon-adsystem.com/widgets/q?_encoding=UTF8&ASIN=B07QR6ZJNX&ServiceVersion=20070822&ID=AsinImage&WS=1&Format=_SL250_&tag=giftly-21",
     productLink: "https://www.amazon.co.uk/dp/B07QR6ZJNX",
     retailer: "Amazon",
     emoji: "🍸",
@@ -38,7 +38,7 @@ export const popularGifts = [
   {
     title: "Ember Temperature Control Smart Mug",
     price: "£89.95",
-    thumbnail: "https://m.media-amazon.com/images/I/51wNwBqMQtL._AC_SL1500_.jpg",
+    thumbnail: "https://ws-eu.amazon-adsystem.com/widgets/q?_encoding=UTF8&ASIN=B07NQRM6ML&ServiceVersion=20070822&ID=AsinImage&WS=1&Format=_SL250_&tag=giftly-21",
     productLink: "https://www.amazon.co.uk/dp/B07NQRM6ML",
     retailer: "Amazon",
     emoji: "☕",
@@ -47,7 +47,7 @@ export const popularGifts = [
   {
     title: "Spa Day Experience for Two",
     price: "£79.00",
-    thumbnail: "https://m.media-amazon.com/images/I/71j7zRSBgYL._AC_SL1500_.jpg",
+    thumbnail: "https://ws-eu.amazon-adsystem.com/widgets/q?_encoding=UTF8&ASIN=B01MQWUXEC&ServiceVersion=20070822&ID=AsinImage&WS=1&Format=_SL250_&tag=giftly-21",
     productLink: "https://www.amazon.co.uk/dp/B01MQWUXEC",
     retailer: "Virgin Experience Days",
     emoji: "🧖",

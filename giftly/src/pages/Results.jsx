@@ -9,6 +9,7 @@ import {
   Mail,
   ChevronDown,
   Sparkles,
+  Heart,
 } from "lucide-react";
 import GiftCard from "../components/GiftCard";
 import Toast from "../components/Toast";
@@ -122,37 +123,66 @@ function ErrorState({ message, onRetry }) {
   );
 }
 
-// ─── Idea section component ─────────────────────────────────────────
+// ─── Product card component ─────────────────────────────────────────
 
-function IdeaSection({ idea }) {
+function ProductCard({ product }) {
+  const [imgError, setImgError] = useState(false);
+
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.02]">
-      {/* Section header */}
-      <div className="px-5 py-4 sm:px-6 sm:py-5">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl">{idea.emoji}</span>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-white">{idea.ideaTitle}</h3>
-            {idea.reason && (
-              <p className="mt-0.5 text-sm text-white/40">{idea.reason}</p>
-            )}
-          </div>
-        </div>
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:border-gold/40 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-gold/5">
+      {/* Image */}
+      <div className="relative aspect-[3/2] overflow-hidden bg-deep-purple-light/40">
+        {!imgError ? (
+          <img
+            src={product.thumbnail || "https://placehold.co/400x400/1a0533/gold?text=Gift+Idea"}
+            alt={product.title || "Gift Idea"}
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <img
+            src="https://placehold.co/400x400/1a0533/gold?text=Gift+Idea"
+            alt="Gift Idea"
+            className="h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03]"
+          />
+        )}
+
+        {/* Wishlist heart */}
+        <button
+          type="button"
+          className="absolute right-3 top-3 rounded-full bg-black/40 p-2 text-white/70 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:bg-black/50"
+          aria-label="Add to wishlist"
+        >
+          <Heart size={18} className="text-white/70" />
+        </button>
       </div>
 
-      {/* Product grid for this idea */}
-      <div className="px-5 pb-5 sm:px-6 sm:pb-6">
-        {idea.products.length === 0 ? (
-          <p className="text-sm text-white/30">No products found for this idea.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {idea.products.map((product, idx) => (
-              <GiftCard key={`${idea.ideaTitle}_${idx}`} gift={product} />
-            ))}
-          </div>
+      {/* Content */}
+      <div className="flex flex-1 flex-col p-5">
+        {product.retailer && (
+          <p className="text-xs font-medium uppercase tracking-widest text-white/30">
+            {product.retailer}
+          </p>
         )}
+        <h3 className="mt-1.5 text-lg font-bold leading-snug text-white group-hover:text-gold transition-colors">
+          {product.title || "Gift Idea"}
+        </h3>
+        <p className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
+          <span className="text-sm font-bold text-gold">
+            {product.price ? product.price : "Price unavailable"}
+          </span>
+          <a
+            href={product.productLink || "#"}
+            rel="noopener noreferrer"
+            target="_blank"
+            className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition-all hover:bg-gold hover:text-deep-purple"
+          >
+            Buy Now
+          </a>
+        </p>
       </div>
-    </section>
+    </article>
   );
 }
 
@@ -259,6 +289,14 @@ export default function Results() {
   // Gift search hook (AI-powered)
   const { results: aiResults, loading: aiLoading, error: aiError, search } = useGiftSearch();
 
+  // Flatten all products from all ideas into a single array
+  const products = useMemo(() => {
+    if (!aiResults?.length) return [];
+    return aiResults.flatMap((idea) => idea.products ?? []);
+  }, [aiResults]);
+
+  if (!aiResults) return <LoadingSkeleton />;
+
   // State
   const [query, setQuery] = useState(initialQuery);
   const [budget, setBudget] = useState(() => {
@@ -359,6 +397,19 @@ export default function Results() {
 
   const hasActiveFilters = categories.length > 0 || occasion !== "" || budget < 500;
 
+  // Guard against empty results
+  if (aiResults?.length === 0 && !aiLoading && !aiError) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] py-24 text-center">
+        <Search size={48} className="mb-4 text-white/15" />
+        <h3 className="text-xl font-bold text-white">No gifts found</h3>
+        <p className="mt-2 max-w-sm text-sm text-white/40">
+          Try adjusting your budget, categories, or search query to find more results.
+        </p>
+      </div>
+    );
+  }
+
   // Retry handler
   const handleRetry = useCallback(() => {
     if (query.trim()) {
@@ -386,7 +437,7 @@ export default function Results() {
             ? "Searching with Gemini AI…"
             : aiError
               ? "Unable to load results"
-              : `${aiResults?.length || 0} idea${aiResults?.length !== 1 ? "s" : ""} found`}
+              : `${products.length} product${products.length !== 1 ? "s" : ""} found`}
         </p>
       </div>
 
@@ -532,16 +583,12 @@ export default function Results() {
                 Powered by Gemini AI
               </p>
             </>
-          ) : aiResults && aiResults.length > 0 ? (
-            <>
-              {aiResults.map((idea, idx) => (
-                <IdeaSection key={idea.ideaTitle} idea={idea} />
+          ) : products.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {products.map((product, idx) => (
+                <ProductCard key={`${product.title}_${idx}`} product={product} />
               ))}
-              {/* Note about local AI */}
-              <p className="mt-6 text-center text-xs text-white/25">
-                Powered by Gemini AI
-              </p>
-            </>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] py-24 text-center">
               <Search size={48} className="mb-4 text-white/15" />

@@ -159,10 +159,11 @@ export default function useGiftSearch() {
           }
 
           const data = await res.json();
+          console.log("Raw API response:", data);
           // The serverless function now returns { ideas: [...] } shape
           const json = data?.ideas || (Array.isArray(data) ? data : extractJSON(JSON.stringify(data)));
 
-          if (!json || !Array.isArray(json) || json.length === 0) {
+          if (!json || !Array.isArray(json)) {
             throw new Error("API did not return a valid JSON array.");
           }
 
@@ -213,9 +214,10 @@ export default function useGiftSearch() {
               }
 
               const data = await res.json();
+              console.log("Raw API response (retry):", data);
               const json = data?.ideas || (Array.isArray(data) ? data : extractJSON(JSON.stringify(data)));
 
-              if (!json || !Array.isArray(json) || json.length === 0) {
+              if (!json || !Array.isArray(json)) {
                 throw new Error("API did not return a valid JSON array on retry either.");
               }
 

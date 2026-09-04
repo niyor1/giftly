@@ -37,7 +37,10 @@ export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
             alt={gift.title}
             loading="lazy"
             onLoad={handleImageLoad}
-            onError={handleImageError}
+            onError={(e) => {
+              handleImageError();
+              e.target.src = "https://placehold.co/400x400/1a0533/gold?text=Gift+Idea";
+            }}
             className={`h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03] ${
               imgLoaded ? "opacity-100" : "opacity-0"
             }`}
