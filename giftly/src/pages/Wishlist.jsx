@@ -38,7 +38,7 @@ function EmptyState({ onSearch }) {
 
 function WishlistItem({ gift, onRemove }) {
   const [min, max] = parsePriceRange(gift.priceRange);
-  const priceLabel = min !== null && max !== null ? `£${min} – £${max}` : gift.priceRange;
+  const priceLabel = min !== null && max !== null ? `£${min} – £${max}` : gift.priceRange || 'Price unavailable';
   const [imgError, setImgError] = useState(false);
 
   // Use real thumbnail if available; fall back to imageUrl for mockData items
@@ -99,7 +99,7 @@ function WishlistItem({ gift, onRemove }) {
           {gift.category}
         </p>
         <h3 className="mt-1.5 text-lg font-bold leading-snug text-white group-hover:text-gold transition-colors">
-          {gift.title}
+          {gift.title || 'Gift Idea'}
         </h3>
         <p className="mt-2 line-clamp-2 text-sm text-white/50 leading-relaxed flex-1">
           {gift.description}
@@ -110,7 +110,7 @@ function WishlistItem({ gift, onRemove }) {
           <StarRating rating={gift.rating} />
           <span className="text-sm font-semibold text-white/80">{gift.rating}</span>
           <span className="text-xs text-white/30">
-            ({gift.reviewCount.toLocaleString()} reviews)
+            ({(gift.reviewCount?.toLocaleString() ?? 'N/A')} reviews)
           </span>
         </div>
 

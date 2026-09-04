@@ -76,7 +76,7 @@ export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
           {gift.category}
         </p>
         <h3 className="mt-1.5 text-lg font-bold leading-snug text-white group-hover:text-gold transition-colors">
-          {gift.title}
+          {gift.title || 'Gift Idea'}
         </h3>
         <p className="mt-2 line-clamp-2 text-sm text-white/50 leading-relaxed flex-1">
           {gift.description}
@@ -87,7 +87,7 @@ export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
           <StarRating rating={gift.rating} />
           <span className="text-sm font-semibold text-white/80">{gift.rating}</span>
           <span className="text-xs text-white/30">
-            ({gift.reviewCount.toLocaleString()} reviews)
+            ({(gift.reviewCount?.toLocaleString() ?? 'N/A')} reviews)
           </span>
         </div>
 
@@ -100,8 +100,10 @@ export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
                 <span className="ml-2 text-xs text-white/30">From {gift.retailer}</span>
               )}
             </>
+          ) : gift.priceRange ? (
+            <span className="text-sm font-bold text-gold">{gift.priceRange}</span>
           ) : (
-            <span className="text-sm font-bold text-gold">{gift.priceRange || "Price TBD"}</span>
+            <span className="text-sm font-bold text-gold">Price unavailable</span>
           )}
           <a
             href={gift.productLink || gift.affiliateUrl || "#"}
