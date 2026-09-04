@@ -15,6 +15,8 @@ const badgeStyles = {
 // ─── Main component ─────────────────────────────────────────────────
 
 export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
+  if (!gift) return null;
+
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 

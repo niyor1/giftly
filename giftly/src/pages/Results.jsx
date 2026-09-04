@@ -126,6 +126,8 @@ function ErrorState({ message, onRetry }) {
 // ─── Product card component ─────────────────────────────────────────
 
 function ProductCard({ product }) {
+  if (!product) return null;
+
   const [imgError, setImgError] = useState(false);
 
   return (
@@ -292,7 +294,7 @@ export default function Results() {
   // Flatten all products from all ideas into a single array
   const products = useMemo(() => {
     if (!aiResults?.length) return [];
-    return aiResults.flatMap((idea) => idea.products ?? []);
+    return aiResults.flatMap((idea) => idea?.products ?? []);
   }, [aiResults]);
 
   if (!aiResults) return <LoadingSkeleton />;
