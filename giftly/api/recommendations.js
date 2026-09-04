@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generativeai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ─── URL sanitization ────────────────────────────────────────────────
 
