@@ -4,7 +4,8 @@ import { Sparkles, Search, Gift, X as XIcon } from "lucide-react";
 import GiftCard from "../components/GiftCard";
 import useWishlist from "../hooks/useWishlist";
 import StarRating from "../components/StarRating";
-import { giftIdeas, customerReviews } from "../data/mockData";
+import { customerReviews } from "../data/mockData";
+import { popularGifts } from "../data/popularGifts";
 import { useAiLoading } from "../context/AiLoadingContext";
 
 // ─── Data ──────────────────────────────────────────────────────────
@@ -221,79 +222,10 @@ function SearchBar({ onSearch }) {
   );
 }
 
-// ─── Popular Gifts section ──────────────────────────────────────────
-
-// ─── Skeleton loading grid (6 cards) ────────────────────────────────
-
-function PopularGiftsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
-        >
-          <div className="aspect-[3/2] animate-pulse bg-white/5" />
-          <div className="flex flex-1 flex-col p-5">
-            <div className="h-3 w-20 animate-pulse rounded bg-white/10" />
-            <div className="mt-2 h-5 w-3/4 animate-pulse rounded bg-white/10" />
-            <div className="mt-3 h-3 w-full animate-pulse rounded bg-white/5" />
-            <div className="mt-1 h-3 w-5/6 animate-pulse rounded bg-white/5" />
-            <div className="mt-4 flex items-center gap-2">
-              <div className="h-3 w-16 animate-pulse rounded bg-white/10" />
-              <div className="h-3 w-8 animate-pulse rounded bg-white/10" />
-            </div>
-            <div className="mt-auto pt-4">
-              <div className="flex items-center justify-between border-t border-white/10">
-                <div className="h-4 w-20 animate-pulse rounded bg-gold/20" />
-                <div className="h-8 w-24 animate-pulse rounded-lg bg-gold/10" />
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Popular Gifts section (fetches real AI data) ──────────────────
+// ─── Popular Gifts section (hardcoded curated list) ──────────────────
 
 function PopularGifts() {
-  const [gifts, setGifts] = useState(null); // null = loading, [] = error/fallback
-  const [loading, setLoading] = useState(true);
   const wishlist = useWishlist();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch("/api/recommendations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: "popular gifts for any occasion", budgetRange: "£0 – £500" }),
-        });
-        if (!res.ok) throw new Error("API error");
-        const data = await res.json();
-        if (!cancelled) {
-          setGifts(Array.isArray(data) && data.length > 0 ? data.slice(0, 6) : null);
-        }
-      } catch {
-        // Silent fallback — will use mockData below
-        if (!cancelled) setGifts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, []);
-
-  // Determine which data to render:
-  //   gifts === null → still loading (handled by skeleton branch)
-  //   gifts.length > 0 → real API data
-  //   gifts.length === 0 → API failed, use mockData
-  const featured = gifts?.length > 0 ? gifts : giftIdeas.slice(0, 6);
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
@@ -306,20 +238,16 @@ function PopularGifts() {
         </p>
       </div>
 
-      {loading ? (
-        <PopularGiftsSkeleton />
-      ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((gift) => (
-            <GiftCard
-              key={gift.id || gift.title}
-              gift={gift}
-              onWishlistToggle={wishlist.toggle}
-              isWishlisted={wishlist.has(gift.id)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {popularGifts.map((gift) => (
+          <GiftCard
+            key={gift.title}
+            gift={gift}
+            onWishlistToggle={wishlist.toggle}
+            isWishlisted={wishlist.has(gift.title)}
+          />
+        ))}
+      </div>
 
       <div className="mt-10 text-center">
         <Link

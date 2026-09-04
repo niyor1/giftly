@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generativeai";
 
 // ─── URL sanitization ────────────────────────────────────────────────
 
@@ -22,11 +22,11 @@ const SYSTEM_PROMPT =
 
 /**
  * Fetch Google Shopping results from SerpApi for a single search query.
- * Returns the first product result, or null on failure / no results.
+ * Returns up to 6 products, or an empty array on failure / no results.
  */
-async function fetchProduct(searchQuery) {
+async function fetchProducts(searchQuery) {
   const apiKey = process.env.SERPAPI_KEY;
-  if (!apiKey || apiKey === "your_serpapi_key_here") return null;
+  if (!apiKey || apiKey === "your_serpapi_key_here") return [];
 
   const url = new URL("https://serpapi.com/search.json");
   url.searchParams.set("engine", "google_shopping");
@@ -40,32 +40,27 @@ async function fetchProduct(searchQuery) {
 
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
     const products = data?.shopping_results || [];
-    if (!products.length) return null;
-    const p = products[0];
+    if (!products.length) return [];
 
-    // Multi-level product link priority:
-    // 1. result.link (direct shopping URL)
-    // 2. result.product_link (alternative SerpApi field)
-    // 3. sellers_results.online_sellers[0].link (first online seller)
-    const rawProductLink =
-      p.link ||
-      p.product_link ||
-      p.sellers_results?.online_sellers?.[0]?.link ||
-      null;
-
-    return {
-      title: p.title || searchQuery,
-      price: p.price || null,
-      thumbnail: p.thumbnail || p.img_url || null,
-      link: sanitizeUrl(p.link) || null,
-      productLink: sanitizeUrl(rawProductLink) || null,
-      source: p.source || null,
-    };
+    return products.slice(0, 6).map((p) => {
+      const rawProductLink =
+        p.link ||
+        p.product_link ||
+        p.sellers_results?.online_sellers?.[0]?.link ||
+        null;
+      return {
+        title: p.title || searchQuery,
+        price: p.price || null,
+        thumbnail: p.thumbnail || p.img_url || null,
+        productLink: sanitizeUrl(rawProductLink) || null,
+        retailer: p.source || null,
+      };
+    });
   } catch {
-    return null;
+    return [];
   } finally {
     clearTimeout(timeoutId);
   }
@@ -84,7 +79,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing query or budgetRange" });
   }
 
-  const userMessage = `Generate 12 gift ideas for: ${query}. Budget: ${budgetRange}. Return a JSON array where each object has exactly these fields: title, description, priceRange, category, searchQuery, reason, emoji. The searchQuery field should be a short Amazon UK search term for that product.`;
+  const userMessage = `Generate exactly 3 gift ideas for: ${query}. Budget: ${budgetRange}. Each idea should be a specific product (not a broad category). Return a JSON array where each object has exactly these fields: ideaTitle, description, reason, emoji, category, searchQuery. The searchQuery field must be a short, specific Google Shopping search term for finding real products. Do NOT return more than 3 ideas.`;
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -93,7 +88,6 @@ export default async function handler(req, res) {
     const result = await model.generateContent([SYSTEM_PROMPT, userMessage]);
     const text = result.response.text();
 
-    // Parse the raw JSON array from Gemini's response
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -127,40 +121,22 @@ export default async function handler(req, res) {
       throw new Error("Response was not a JSON array");
     }
 
-    // Fetch real product data from SerpApi in batches of 3
-    const BATCH_SIZE = 3;
-    const merged = [];
+    // Fetch up to 6 products for each of the 3 ideas — all in parallel
+    const ideasWithProducts = await Promise.all(
+      parsed.map(async (idea) => {
+        const products = await fetchProducts(idea.searchQuery || idea.ideaTitle);
+        return {
+          ideaTitle: idea.ideaTitle,
+          description: idea.description || "",
+          reason: idea.reason || "",
+          emoji: idea.emoji || "🎁",
+          category: idea.category || "Gift Idea",
+          products,
+        };
+      }),
+    );
 
-    for (let i = 0; i < parsed.length; i += BATCH_SIZE) {
-      const batch = parsed.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(async (item) => {
-          const product = await fetchProduct(item.searchQuery || item.title);
-
-          // Fallback: Amazon UK search link if no SerpApi result
-          const fallbackLink = `https://www.amazon.co.uk/s?k=${encodeURIComponent(item.searchQuery || item.title)}`;
-
-          // Build productLink with full priority chain + sanitizeUrl validation
-          const rawProductLink =
-            product?.link ||
-            product?.product_link ||
-            product?.sellers_results?.online_sellers?.[0]?.link ||
-            null;
-          const resolvedProductLink = sanitizeUrl(rawProductLink) || fallbackLink;
-
-          return {
-            ...item,
-            price: product?.price || null,
-            thumbnail: product?.thumbnail || null,
-            productLink: resolvedProductLink,
-            retailer: product?.source || "Amazon UK",
-          };
-        }),
-      );
-      merged.push(...results);
-    }
-
-    return res.status(200).json(merged);
+    return res.status(200).json({ ideas: ideasWithProducts });
   } catch (err) {
     console.error("Gemini API error:", err.message);
     return res.status(500).json({ error: "Failed to generate gift recommendations" });

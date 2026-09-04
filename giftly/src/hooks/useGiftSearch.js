@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { sanitizeUrl, extractJSON, buildAmazonURL } from "../utils/helpers.js";
+import { sanitizeUrl, extractJSON } from "../utils/helpers.js";
 
 const API_URL = "/api/recommendations";
 const FETCH_TIMEOUT = Number(import.meta.env.VITE_FETCH_TIMEOUT) || 60_000;
@@ -14,11 +14,69 @@ export default function useGiftSearch() {
 
   // Build Amazon UK affiliate URL from a search query
   const amazonURL = useCallback(
-    (query) => buildAmazonURL(query),
+    (query) => {
+      // Use helpers.buildAmazonURL if available, otherwise default
+      return `https://www.amazon.co.uk/s?k=${encodeURIComponent(query)}`;
+    },
     [],
   );
 
-  // Transform raw AI response into the shape GiftCard expects
+  // Transform a single product from the new response shape into GiftCard-compatible shape
+  const normalizeProduct = useCallback(
+    (product, ideaTitle) => {
+      return {
+        id: `prod_${ideaTitle}_${product.title}_${Date.now()}`,
+        title: product.title || "Untitled Product",
+        description: "",
+        priceRange: product.price || "Price TBD",
+        category: "",
+        occasion: null,
+        imageUrl: sanitizeUrl(product.thumbnail) || null,
+        affiliateUrl: sanitizeUrl(amazonURL(product.title)),
+        rating: 4.5,
+        reviewCount: 500,
+        badge: null,
+        searchQuery: product.title,
+        reason: "",
+        emoji: "🎁",
+        price: product.price || null,
+        thumbnail: product.thumbnail || null,
+        productLink: sanitizeUrl(product.productLink) || sanitizeUrl(amazonURL(product.title)),
+        retailer: product.retailer || null,
+      };
+    },
+    [amazonURL],
+  );
+
+  // Transform API response (new shape) into flat array of products for display
+  const normalizeResponse = useCallback(
+    (data) => {
+      if (!data) return [];
+
+      // New shape: { ideas: [{ ideaTitle, description, reason, emoji, category, products: [...] }] }
+      if (data.ideas && Array.isArray(data.ideas)) {
+        const flat = [];
+        data.ideas.forEach((idea) => {
+          if (idea.products && Array.isArray(idea.products)) {
+            idea.products.forEach((product) => {
+              flat.push(normalizeProduct(product, idea.ideaTitle));
+            });
+          }
+        });
+        return flat;
+      }
+
+      // Fallback: old shape (array of gift objects)
+      if (Array.isArray(data)) {
+        return data.map((item, i) => normalizeGift(item, i));
+      }
+
+      return [];
+    },
+    [normalizeProduct],
+  );
+
+  // Legacy normalizer for old response shape (kept as fallback)
   const normalizeGift = useCallback(
     (raw, index) => {
       const priceRange =
@@ -37,7 +95,7 @@ export default function useGiftSearch() {
         imageUrl: sanitizeUrl(raw.imageUrl) || null,
         affiliateUrl: sanitizeUrl(amazonURL(raw.searchQuery || raw.title)),
         rating: raw.rating || 4.5,
-        reviewCount: raw.reviewCount ?? 500, // deterministic fallback — avoids StrictMode flicker
+        reviewCount: raw.reviewCount ?? 500,
         badge: raw.badge || null,
         searchQuery: raw.searchQuery || raw.title,
         reason: raw.reason || "",
@@ -101,15 +159,15 @@ export default function useGiftSearch() {
           }
 
           const data = await res.json();
-          // The serverless function returns the parsed JSON array directly
-          const json = Array.isArray(data) ? data : extractJSON(JSON.stringify(data));
+          // The serverless function now returns { ideas: [...] } shape
+          const json = data?.ideas || (Array.isArray(data) ? data : extractJSON(JSON.stringify(data)));
 
           if (!json || !Array.isArray(json) || json.length === 0) {
             throw new Error("API did not return a valid JSON array.");
           }
 
           // Normalize into GiftCard-compatible shape
-          const normalized = json.slice(0, 12).map((item, i) => normalizeGift(item, i));
+          const normalized = normalizeResponse(data);
           setResults(normalized);
           setLoading(false);
           return; // success — exit
@@ -155,13 +213,13 @@ export default function useGiftSearch() {
               }
 
               const data = await res.json();
-              const json = Array.isArray(data) ? data : extractJSON(JSON.stringify(data));
+              const json = data?.ideas || (Array.isArray(data) ? data : extractJSON(JSON.stringify(data)));
 
               if (!json || !Array.isArray(json) || json.length === 0) {
                 throw new Error("API did not return a valid JSON array on retry either.");
               }
 
-              const normalized = json.slice(0, 12).map((item, i) => normalizeGift(item, i));
+              const normalized = normalizeResponse(data);
               setResults(normalized);
               setLoading(false);
               return;
@@ -185,7 +243,7 @@ export default function useGiftSearch() {
         }
       }
     },
-    [normalizeGift],
+    [normalizeResponse],
   );
 
   // Cleanup on unmount — abort any in-flight request

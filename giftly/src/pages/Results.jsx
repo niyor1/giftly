@@ -122,6 +122,40 @@ function ErrorState({ message, onRetry }) {
   );
 }
 
+// ─── Idea section component ─────────────────────────────────────────
+
+function IdeaSection({ idea }) {
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.02]">
+      {/* Section header */}
+      <div className="px-5 py-4 sm:px-6 sm:py-5">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">{idea.emoji}</span>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-white">{idea.ideaTitle}</h3>
+            {idea.reason && (
+              <p className="mt-0.5 text-sm text-white/40">{idea.reason}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Product grid for this idea */}
+      <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+        {idea.products.length === 0 ? (
+          <p className="text-sm text-white/30">No products found for this idea.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {idea.products.map((product, idx) => (
+              <GiftCard key={`${idea.ideaTitle}_${idx}`} gift={product} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Sidebar component ─────────────────────────────────────────────
 
 function ResultsSidebar({
@@ -255,41 +289,10 @@ export default function Results() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
 
-  // Filtered & sorted results from AI
-  const displayed = useMemo(() => {
-    let filtered = aiResults.filter((gift) => {
-      if (!matchesBudget(gift, budget)) return false;
-      if (!matchesCategory(gift, categories)) return false;
-      if (!matchesOccasion(gift, occasion)) return false;
-      return true;
-    });
-
-    // Sort — spread to avoid mutating the filtered array (which would corrupt the memoized result)
-    if (sortBy === "price-low") {
-      return [...filtered].sort((a, b) => {
-        const pa = parsePriceForSort(a.priceRange);
-        const pb = parsePriceForSort(b.priceRange);
-        if (pa === null || pb === null) return 0;
-        return pa - pb;
-      });
-    } else if (sortBy === "price-high") {
-      return [...filtered].sort((a, b) => {
-        const pa = parsePriceForSort(a.priceRange);
-        const pb = parsePriceForSort(b.priceRange);
-        if (pa === null || pb === null) return 0;
-        return pb - pa;
-      });
-    } else if (sortBy === "rating") {
-      return [...filtered].sort((a, b) => b.rating - a.rating);
-    }
-
-    return filtered;
-  }, [aiResults, budget, categories, occasion, sortBy]);
-
   // Check if a gift matches the budget (priceRange contains a value <= budget)
   function matchesBudget(gift, budget) {
     if (!budget || budget >= 500) return true;
-    const price = parsePriceForSort(gift.priceRange);
+    const price = parsePriceForSort(gift.price);
     if (price === null) return true;
     return price <= budget;
   }
@@ -298,12 +301,6 @@ export default function Results() {
   function matchesCategory(gift, cats) {
     if (cats.length === 0) return true;
     return cats.includes(gift.category);
-  }
-
-  // Check if a gift matches selected occasion
-  function matchesOccasion(gift, occ) {
-    if (!occ) return true;
-    return gift.occasion === occ || (gift.occasion && gift.occasion.replace(/-/g, " ").includes(occ.toLowerCase()));
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,7 +386,7 @@ export default function Results() {
             ? "Searching with Gemini AI…"
             : aiError
               ? "Unable to load results"
-              : `${displayed.length} result${displayed.length !== 1 ? "s" : ""} found`}
+              : `${aiResults?.length || 0} idea${aiResults?.length !== 1 ? "s" : ""} found`}
         </p>
       </div>
 
@@ -509,7 +506,7 @@ export default function Results() {
           />
         </div>
 
-        {/* Results grid */}
+        {/* Results */}
         <div className="flex-1">
           {aiLoading ? (
             <>
@@ -535,7 +532,17 @@ export default function Results() {
                 Powered by Gemini AI
               </p>
             </>
-          ) : displayed.length === 0 ? (
+          ) : aiResults && aiResults.length > 0 ? (
+            <>
+              {aiResults.map((idea, idx) => (
+                <IdeaSection key={idea.ideaTitle} idea={idea} />
+              ))}
+              {/* Note about local AI */}
+              <p className="mt-6 text-center text-xs text-white/25">
+                Powered by Gemini AI
+              </p>
+            </>
+          ) : (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] py-24 text-center">
               <Search size={48} className="mb-4 text-white/15" />
               <h3 className="text-xl font-bold text-white">No gifts found</h3>
@@ -543,18 +550,6 @@ export default function Results() {
                 Try adjusting your budget, categories, or search query to find more results.
               </p>
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {displayed.map((gift) => (
-                  <GiftCard key={gift.id} gift={gift} />
-                ))}
-              </div>
-              {/* Note about local AI */}
-              <p className="mt-6 text-center text-xs text-white/25">
-                Powered by Gemini AI
-              </p>
-            </>
           )}
         </div>
       </div>
