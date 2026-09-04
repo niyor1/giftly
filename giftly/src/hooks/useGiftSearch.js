@@ -160,13 +160,17 @@ export default function useGiftSearch() {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const data = await fetchWithTimeout();
-          console.log("Raw API response:", data);
+          console.log("[useGiftSearch] Raw API response:", JSON.stringify(data, null, 2));
 
           if (!validateResponse(data)) {
             throw new Error(attempt === 1 ? "API did not return a valid JSON array." : "API did not return a valid JSON array on retry.");
           }
 
-          setResults(normalize(data));
+          const normalized = normalize(data);
+          console.log("[useGiftSearch] Parsed data, results count:", normalized.length);
+          console.log("[useGiftSearch] Normalized results sample:", JSON.stringify(normalized.slice(0, 2), null, 2));
+
+          setResults(normalized);
           setLoading(false);
           return; // success — exit
         } catch (err) {
