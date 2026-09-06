@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const SYSTEM_PROMPT =
   "You are a gift recommendation expert. Respond with ONLY a valid JSON array. " +
@@ -27,7 +27,7 @@ function sanitizeUrl(url) {
 
 // ─── Main handler ───────────────────────────────────────────────────
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
