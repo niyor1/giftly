@@ -2,6 +2,17 @@ export const config = {
   runtime: 'edge'
 }
 
+export const maxDuration = 20
+
+// ─── Timeout helper ────────────────────────────────────────────────
+
+const fetchWithTimeout = (url, ms = 6000) => {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), ms)
+  )
+  return Promise.race([fetch(url), timeout])
+}
+
 // ─── URL sanitization ────────────────────────────────────────────────
 
 function sanitizeUrl(url) {
@@ -46,7 +57,12 @@ async function fetchProducts(searchQuery) {
 
   console.log("[fetchProducts] SerpApi URL:", url.toString());
 
-  const res = await fetch(url.toString());
+  let res;
+  try {
+    res = await fetchWithTimeout(url.toString());
+  } catch {
+    return [];
+  }
   console.log("[fetchProducts] SerpApi status:", res.status);
   if (!res.ok) return [];
 
@@ -169,23 +185,12 @@ export default async function handler(req) {
     console.log("[handler] Parsed ideas count:", parsed.length);
 
     // Fetch products for each idea in parallel
-    const results = await Promise.all(
-      parsed.map(async (idea) => {
-        const searchQ = idea.searchQuery || idea.ideaTitle;
-        console.log("[handler] Fetching products for idea:", JSON.stringify(idea));
-        const products = await fetchProducts(searchQ);
-        console.log("[handler] Products fetched for", idea.ideaTitle, ":", products.length);
-
-        return {
-          ideaTitle: idea.ideaTitle,
-          description: idea.description || "",
-          reason: idea.reason || "",
-          emoji: idea.emoji || "🎁",
-          category: idea.category || "Gift Idea",
-          products,
-        };
-      })
-    );
+    const ideas = parsed.map((idea) => idea.searchQuery || idea.ideaTitle);
+    const settled = await Promise.allSettled(ideas.map(idea => fetchProducts(idea)));
+    const results = settled.map((result, i) => ({
+      ...parsed[i],
+      products: result.status === 'fulfilled' ? result.value : [],
+    }));
 
     return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' }
