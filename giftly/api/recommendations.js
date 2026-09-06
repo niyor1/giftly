@@ -41,7 +41,7 @@ export default async function handler(req, res) {
   const userMessage = `Generate exactly 1 gift idea for: ${query}. Budget: ${budgetRange}. The idea should be a specific product (not a broad category). Return a JSON array where each object has exactly these fields: ideaTitle, description, reason, emoji, category, searchQuery. The searchQuery field must be a short, specific Google Shopping search term for finding real products.`;
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
 
   const geminiResult = await model.generateContent(`${SYSTEM_PROMPT}\n\n${userMessage}`);
   let rawText = geminiResult.response.text();
