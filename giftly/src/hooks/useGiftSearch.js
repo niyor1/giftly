@@ -33,8 +33,9 @@ export default function useGiftSearch() {
       setError(null);
       setResults([]);
 
+      const safeBudget = budget ?? 500;
       const budgetRange =
-        budget !== null && budget < 500 ? `£0 – £${budget}` : "No strict budget";
+        safeBudget < 500 ? `£0 – £${safeBudget}` : "No strict budget";
 
       const controller = new AbortController();
       abortRef.current = controller;

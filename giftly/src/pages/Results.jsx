@@ -283,7 +283,7 @@ function ResultsSidebar({
 export default function Results() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
-  const urlBudget = searchParams.get("budget");
+  const urlBudget = searchParams.get("budget") ?? "500";
   const { setAiLoading } = useAiLoading();
 
   // Gift search hook (AI-powered, SSE streaming)
@@ -298,9 +298,8 @@ export default function Results() {
   // State
   const [query, setQuery] = useState(initialQuery);
   const [budget, setBudget] = useState(() => {
-    if (urlBudget) return Math.min(Number(urlBudget), 500);
-    const extracted = extractBudget(initialQuery);
-    return extracted || 500;
+    const parsed = Math.min(Number(urlBudget), 500);
+    return isNaN(parsed) || parsed < 0 ? 500 : parsed;
   });
   const [categories, setCategories] = useState([]);
   const [occasion, setOccasion] = useState("");

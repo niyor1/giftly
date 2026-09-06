@@ -1,11 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, Search, Gift, X as XIcon } from "lucide-react";
 import GiftCard from "../components/GiftCard";
 import useWishlist from "../hooks/useWishlist";
 import StarRating from "../components/StarRating";
 import { customerReviews } from "../data/mockData";
-import { popularGifts } from "../data/popularGifts";
 import { useAiLoading } from "../context/AiLoadingContext";
 
 // ─── Data ──────────────────────────────────────────────────────────
@@ -222,10 +221,42 @@ function SearchBar({ onSearch }) {
   );
 }
 
-// ─── Popular Gifts section (hardcoded curated list) ──────────────────
+// ─── Popular Gifts section (live SerpApi results) ──────────────────
+
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+      <div className="aspect-[3/2] animate-pulse bg-white/5" />
+      <div className="flex flex-1 flex-col p-5">
+        <div className="mt-1.5 h-4 w-1/3 animate-pulse rounded bg-white/10" />
+        <div className="mt-2 h-5 w-full animate-pulse rounded bg-white/10" />
+        <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-white/10" />
+        <div className="mt-4 h-6 w-1/4 animate-pulse rounded bg-white/10" />
+      </div>
+    </div>
+  );
+}
 
 function PopularGifts() {
+  const [gifts, setGifts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const wishlist = useWishlist();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/popular-gifts")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setGifts(data);
+      })
+      .catch(() => {
+        // Silently fall back to nothing
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
@@ -239,14 +270,16 @@ function PopularGifts() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {popularGifts.map((gift) => (
-          <GiftCard
-            key={gift.title}
-            gift={gift}
-            onWishlistToggle={wishlist.toggle}
-            isWishlisted={wishlist.has(gift.title)}
-          />
-        ))}
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+          : gifts.map((gift) => (
+              <GiftCard
+                key={gift.title}
+                gift={gift}
+                onWishlistToggle={wishlist.toggle}
+                isWishlisted={wishlist.has(gift.title)}
+              />
+            ))}
       </div>
 
       <div className="mt-10 text-center">

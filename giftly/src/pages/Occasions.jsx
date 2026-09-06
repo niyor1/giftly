@@ -89,7 +89,7 @@ export default function Occasions() {
   );
 
   const handleNavigate = (query) => {
-    navigate(`/results?q=${encodeURIComponent(query)}`);
+    navigate(`/results?q=${encodeURIComponent(query)}&budget=500`);
   };
 
   return (

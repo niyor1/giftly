@@ -44,8 +44,8 @@ function HomeWithSearch() {
 
   const handleSearch = (query, budget) => {
     if (!query.trim()) return;
-    const params = new URLSearchParams({ q: query });
-    if (budget < 500) params.set("budget", String(budget));
+    const safeBudget = budget ?? 500;
+    const params = new URLSearchParams({ q: query, budget: String(safeBudget) });
     navigate(`/results?${params.toString()}`);
   };
 

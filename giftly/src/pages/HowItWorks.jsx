@@ -1,9 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  PenLine,
-  Lightbulb,
-  ArrowRight,
   ChevronDown,
   Search,
   Gift,
@@ -14,22 +11,22 @@ import {
 
 const steps = [
   {
-    icon: PenLine,
+    emoji: "✍️",
     title: "Describe your recipient",
     description:
-      "Tell us who you're buying for — their interests, age, style, and the occasion. The more details, the better the results.",
+      "Tell us who you're buying for — their interests, age, style, and the occasion. The more detail, the better the results.",
   },
   {
-    icon: Lightbulb,
+    emoji: "🎁",
     title: "Get personalised ideas",
     description:
-      "Our AI-powered engine curates a list of unique gifts tailored to your recipient. Browse, save, and compare your favourites.",
+      "Our AI curates a list of unique gifts tailored to your recipient. Browse, save, and compare your favourites.",
   },
   {
-    icon: ArrowRight,
+    emoji: "🛒",
     title: "Buy with one click",
     description:
-      "Found the perfect gift? Follow our curated link to purchase directly from trusted retailers. No middleman, no extra fees.",
+      "Found the perfect gift? Click through to purchase directly from trusted retailers. No middleman, no extra fees.",
   },
 ];
 
@@ -78,27 +75,30 @@ const faqs = [
   },
 ];
 
-// ─── Sub-components ─────────────────────────────────────────────────
+// ─── Step Card component ──────────────────────────────────────────
 
-function StepCard({ icon: Icon, stepNumber, title, description }) {
+function StepCard({ emoji, stepNumber, title, description }) {
   return (
-    <div className="group flex flex-col items-center text-center">
-      {/* Connector line between steps */}
-      <div className="absolute left-0 top-12 hidden h-px w-full -translate-x-1/2 bg-gradient-to-r from-transparent via-gold/30 to-transparent lg:block" />
+    <div className="group relative flex flex-col items-center rounded-2xl border border-transparent bg-white/[0.03] p-10 text-center transition-all duration-300 hover:border-gold/40 hover:shadow-lg hover:shadow-gold/5">
+      {/* Gold gradient accent bar at top */}
+      <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
 
-      <div className="relative mb-6 flex items-center justify-center">
-        {/* Icon circle */}
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gold/10 text-gold transition-all duration-300 group-hover:bg-gold/20 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-gold/10">
-          <Icon size={32} strokeWidth={1.5} />
-        </div>
-
-        {/* Step number badge */}
-        <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-gold text-xs font-bold text-deep-purple shadow-lg shadow-gold/20">
-          {stepNumber}
-        </span>
+      {/* Large number badge */}
+      <div className="absolute left-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-gold/10 text-lg font-bold text-gold">
+        {stepNumber}
       </div>
 
-      <h3 className="mb-3 text-xl font-bold text-white">{title}</h3>
+      {/* Emoji icon */}
+      <div className="mt-14 mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-white/[0.03] text-6xl transition-all duration-300 group-hover:bg-gold/10">
+        {emoji}
+      </div>
+
+      {/* Title */}
+      <h3 className="mb-3 text-xl font-bold text-white group-hover:text-gold transition-colors">
+        {title}
+      </h3>
+
+      {/* Description */}
       <p className="max-w-sm text-sm leading-relaxed text-white/50">
         {description}
       </p>
@@ -174,12 +174,12 @@ export default function HowItWorks() {
 
       {/* ── 3 Steps ──────────────────────────────────────────── */}
 
-      <section className="mb-28 relative">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-3 lg:gap-8">
+      <section className="mb-28">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-8">
           {steps.map((step, i) => (
             <StepCard
               key={step.title}
-              icon={step.icon}
+              emoji={step.emoji}
               stepNumber={i + 1}
               title={step.title}
               description={step.description}
