@@ -1,4 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+export const config = {
+  runtime: 'edge'
+}
 
 // ─── URL sanitization ────────────────────────────────────────────────
 
@@ -91,32 +93,46 @@ async function fetchProducts(searchQuery) {
 
 // ─── Main handler ───────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+export default async function handler(req) {
   // Allow only POST requests
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const { query, budgetRange } = req.body || {};
+  const body = await req.json();
+  const { query, budgetRange } = body;
   console.log("[handler] Incoming request body:", JSON.stringify({ query, budgetRange }));
 
   if (!query || !budgetRange) {
-    return res.status(400).json({ error: "Missing query or budgetRange" });
+    return new Response(JSON.stringify({ error: "Missing query or budgetRange" }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const userMessage = `Generate exactly 3 gift ideas for: ${query}. Budget: ${budgetRange}. Each idea should be a specific product (not a broad category). Return a JSON array where each object has exactly these fields: ideaTitle, description, reason, emoji, category, searchQuery. The searchQuery field must be a short, specific Google Shopping search term for finding real products. Do NOT return more than 3 ideas.`;
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userMessage}` }] }]
+        })
+      }
+    );
 
-    console.log("[handler] Sending request to Gemini...");
-    const result = await model.generateContent([SYSTEM_PROMPT, userMessage]);
-    const text = result.response.text();
-    console.log("[handler] Raw Gemini response:", text);
+    const geminiData = await geminiResponse.json();
+    let rawText = geminiData.candidates[0].content.parts[0].text;
+    console.log("[handler] Raw Gemini response:", rawText);
 
     // Strip thinking tags (Gemini may wrap output in <thinking>...</thinking>)
-    let cleaned = text.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, "").trim();
+    let cleaned = rawText.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, "").trim();
 
     // Strip markdown backticks and json language tag
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
@@ -129,38 +145,38 @@ export default async function handler(req, res) {
     } catch (parseErr) {
       console.error("[handler] JSON parse failed:", parseErr.message);
       console.error("[handler] Raw text that failed to parse:", cleaned);
-      // Return empty ideas array instead of crashing
-      return res.status(200).json({ ideas: [] });
+      return new Response(JSON.stringify({ ideas: [] }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     console.log("[handler] Parsed Gemini response:", JSON.stringify(parsed, null, 2));
 
     if (!Array.isArray(parsed)) {
       console.warn("[handler] Gemini response parsed but was not an array, type:", typeof parsed);
-      return res.status(200).json({ ideas: [] });
+      return new Response(JSON.stringify({ ideas: [] }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     if (parsed.length === 0) {
       console.warn("[handler] Gemini returned empty array");
-      return res.status(200).json({ ideas: [] });
+      return new Response(JSON.stringify({ ideas: [] }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     console.log("[handler] Parsed ideas count:", parsed.length);
 
-    // Stream each idea's products one by one as they arrive
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.write("\n"); // start the SSE stream
-
-    try {
-      for (const idea of parsed) {
+    // Fetch products for each idea in parallel
+    const results = await Promise.all(
+      parsed.map(async (idea) => {
         const searchQ = idea.searchQuery || idea.ideaTitle;
         console.log("[handler] Fetching products for idea:", JSON.stringify(idea));
         const products = await fetchProducts(searchQ);
         console.log("[handler] Products fetched for", idea.ideaTitle, ":", products.length);
 
-        const streamedIdeas = {
+        return {
           ideaTitle: idea.ideaTitle,
           description: idea.description || "",
           reason: idea.reason || "",
@@ -168,23 +184,17 @@ export default async function handler(req, res) {
           category: idea.category || "Gift Idea",
           products,
         };
+      })
+    );
 
-        res.write(`event: idea\ndata: ${JSON.stringify(streamedIdeas)}\n\n`);
-      }
-
-      // Signal completion
-      res.write("event: done\ndata: {}\n\n");
-      res.end();
-    } catch (streamErr) {
-      console.error("[handler] Streaming error:", streamErr.message);
-      res.write(`event: error\ndata: ${JSON.stringify({ message: streamErr.message })}\n\n`);
-      res.end();
-    }
+    return new Response(JSON.stringify(results), {
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (err) {
     console.error("[handler] Gemini API error:", err.message);
-    try {
-      res.write(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`);
-      res.end();
-    } catch {}
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
