@@ -11,28 +11,10 @@ export default function useGiftSearch() {
   const isDoneRef = useRef(false);
   const abortRef = useRef(null);
 
-  // Normalize a streamed idea into GiftCard-compatible objects
+  // Return idea objects as-is from the API (each with a .products array)
   const normalizeIdea = useCallback((idea) => {
-    if (!idea?.products?.length) return [];
-    return idea.products.map((product) => ({
-      id: `prod_${idea.ideaTitle}_${product.title}_${Date.now()}`,
-      title: product.title || "Untitled Product",
-      description: "",
-      priceRange: product.price || "Price TBD",
-      category: "",
-      occasion: null,
-      imageUrl: product.thumbnail || null,
-      rating: 4.5,
-      reviewCount: 500,
-      badge: null,
-      searchQuery: product.title,
-      reason: idea.reason || "",
-      emoji: idea.emoji || "🎁",
-      price: product.price || null,
-      thumbnail: product.thumbnail || null,
-      productLink: product.productLink || null,
-      retailer: product.retailer || null,
-    }));
+    if (!idea) return null;
+    return idea;
   }, []);
 
   const search = useCallback(
@@ -74,7 +56,29 @@ export default function useGiftSearch() {
         if (!res.ok) throw new Error(`API returned ${res.status}: ${res.statusText}`);
         if (!res.body) throw new Error("No response body");
 
-        const reader = res.body.getReader();
+        // Log the raw response body as it arrives (SSE stream)
+        const rawReader = res.body.getReader();
+        const rawDecoder = new TextDecoder();
+        let rawBuffer = "";
+        const rawStream = new ReadableStream({
+          start(controller) {
+            function push() {
+              rawReader.read().then(({ done, value }) => {
+                if (done) {
+                  controller.close();
+                  return;
+                }
+                rawBuffer += rawDecoder.decode(value, { stream: true });
+                console.log("[useGiftSearch] Raw API response chunk:", rawBuffer);
+                controller.enqueue(value);
+                push();
+              });
+            }
+            push();
+          },
+        });
+
+        const reader = rawStream.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
@@ -108,9 +112,10 @@ export default function useGiftSearch() {
             if (eventType === "idea") {
               try {
                 const parsed = JSON.parse(dataStr);
+                console.log("[useGiftSearch] Parsed idea:", parsed.ideaTitle, "products:", parsed.products?.length ?? 0);
                 const normalized = normalizeIdea(parsed);
-                setResults((prev) => [...prev, ...normalized]);
-                console.log("[useGiftSearch] Streamed idea:", parsed.ideaTitle, "products:", normalized.length);
+                setResults((prev) => [...prev, normalized]);
+                console.log("[useGiftSearch] Total results in state:", prev.length + 1);
               } catch {
                 // Invalid JSON — ignore
               }

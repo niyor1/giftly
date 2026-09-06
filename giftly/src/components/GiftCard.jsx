@@ -18,6 +18,8 @@ export default function GiftCard({ gift, onWishlistToggle, isWishlisted }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  console.log("[GiftCard] props received:", { title: gift?.title, price: gift?.price, thumbnail: gift?.thumbnail, productLink: gift?.productLink, retailer: gift?.retailer });
+
   const handleImageLoad = useCallback(() => setImgLoaded(true), []);
   const handleImageError = useCallback(() => setImgError(true), []);
 
