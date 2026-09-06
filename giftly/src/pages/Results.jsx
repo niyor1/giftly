@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -292,15 +292,8 @@ export default function Results() {
   // Log the data received from useGiftSearch at the top of the component
   console.log("[Results] aiResults:", aiResults);
 
-  // Flatten all products from all ideas into a single array
-  const allProducts = useMemo(() => {
-    const flattened = (aiResults ?? []).flatMap((idea) => idea?.products ?? []);
-    console.log("[Results] allProducts length:", flattened.length, "from", (aiResults ?? []).length, "ideas");
-    return flattened;
-  }, [aiResults]);
-
-  // Backwards-compatible alias for the rest of the component
-  const products = allProducts;
+  // Results is now a flat array of products directly from the API
+  const products = aiResults;
 
   // State
   const [query, setQuery] = useState(initialQuery);
