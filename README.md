@@ -3,10 +3,10 @@
 <div align="center">
 
 ```
-   ___ ___ ___ _____ _ __   __
-  / __|_ _| __|_   _| |\ \ / /
- | (_ || || _|  | | | |_\ V / 
-  \___|___|_|   |_| |____|_|
+    ___ ___ ___ _____ _ __   __
+   / __|_ _| __|_   _| |\ \ / /
+ | (_ || || _|  | | | |_\ V /
+ \___|___|_|   |_| |____|_|
 ```
 
 **AI-powered gift recommendations — described in seconds, delivered instantly.**
@@ -19,11 +19,6 @@
 </div>
 
 Giftly is a web application that helps you find the perfect gift in seconds. Simply describe who the gift is for, pick a budget range, and Giftly's AI engine generates tailored product suggestions with real prices, images, and direct shopping links.
-
-## Screenshots
-
-<!-- TODO: Add screenshots below once available -->
-<!-- Place app screenshots (e.g., home page, results page) in `/public/screenshots/` and link them here -->
 
 ## Features
 
